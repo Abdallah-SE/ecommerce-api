@@ -4,11 +4,12 @@ namespace Modules\User\Services\Api\V1\Admin;
 
 use Modules\User\Models\Admin;
 use Illuminate\Support\Facades\Hash;
-use Modules\User\Exceptions\AdminNotFoundException;
+use Modules\Core\Services\BaseService;
+use Modules\Core\Exceptions\ExceptionFactory;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Modules\User\Repositories\Api\V1\Interfaces\AdminRepositoryInterface;
 
-class AdminService
+class AdminService extends BaseService
 {
     public const DEFAULT_PER_PAGE = 15;
     public const MAX_PER_PAGE = 100;
@@ -22,10 +23,6 @@ class AdminService
 
     /**
      * Paginate admin users.
-     *
-     * @param int $perPage
-     * @param int $page
-     * @return LengthAwarePaginator
      */
     public function paginateAdmins(int $perPage, int $page): LengthAwarePaginator
     {
@@ -37,75 +34,44 @@ class AdminService
 
     /**
      * Create a new admin user.
-     *
-     * @param array $data
-     * @return Admin
      */
     public function createAdmin(array $data): Admin
     {
-        $data['password'] = Hash::make($data['password']);
-        return $this->adminRepository->create($data);
+        return $this->createOrFail('Admin', $data, $this->adminRepository, function($data) {
+            $data['password'] = Hash::make($data['password']);
+            return $this->adminRepository->create($data);
+        });
     }
 
     /**
      * Find an admin by ID or throw exception if not found.
-     *
-     * @param int $id
-     * @return Admin
-     *
-     * @throws AdminNotFoundException
      */
     public function findAdminOrFail(int $id): Admin
     {
-        $admin = $this->adminRepository->find($id);
-
-        if (!$admin) {
-            throw new AdminNotFoundException("Admin with id {$id} not found.");
-        }
-
-        return $admin;
+        return $this->findOrFail('Admin', $id, $this->adminRepository);
     }
 
     /**
      * Update an admin user.
-     *
-     * @param int $id
-     * @param array $data
-     * @return Admin
-     *
-     * @throws AdminNotFoundException
      */
     public function updateAdmin(int $id, array $data): Admin
     {
-        $this->findAdminOrFail($id);
+        return $this->updateOrFail('Admin', $id, $data, $this->adminRepository, function($id, $data) {
+            if (!empty($data['password'])) {
+                $data['password'] = Hash::make($data['password']);
+            } else {
+                unset($data['password']);
+            }
 
-        if (!empty($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
-        } else {
-            unset($data['password']);
-        }
-
-        $updatedAdmin = $this->adminRepository->update($id, $data);
-
-        if (!$updatedAdmin) {
-            // This is a fallback - ideally this shouldn't happen
-            throw new AdminNotFoundException("Failed to update admin with id {$id}.");
-        }
-
-        return $updatedAdmin;
+            return $this->adminRepository->update($id, $data);
+        });
     }
 
     /**
      * Delete an admin user or throw exception if not found.
-     *
-     * @param int $id
-     * @return bool
-     *
-     * @throws AdminNotFoundException
      */
     public function deleteAdminOrFail(int $id): bool
     {
-        $admin =  $this->findAdminOrFail($id);
-        return $this->adminRepository->delete($admin);
+        return $this->deleteOrFail('Admin', $id, $this->adminRepository);
     }
 }
